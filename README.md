@@ -25,4 +25,8 @@ The implementation supports three checksums types:
 * sha512primesums512: checksums for single alignments are produced by SHA-512. They are combined over multiple records by adding up in a prime number field.
   The prime used is 2^512+75.
 
-  
+The hash type can be set using the hash command line parameter:
+
+```
+java -jar BamSeqChksum.jar hash=sha512 < in.bam
+```
