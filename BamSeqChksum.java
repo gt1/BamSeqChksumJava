@@ -31,7 +31,7 @@ public class BamSeqChksum
 			BgzfInput bgzfin = new BgzfInput(System.in);
 			BgzfInput.GetBlockResult GBR = new BgzfInput.GetBlockResult();
 			boolean done = false;
-			BamParser BP = new BamParser();
+			BamParser BP = new BamParser(true,20);
 			
 			String hash = "crc32prod";
 			for ( int i = 0; i < args.length; ++i )

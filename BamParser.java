@@ -81,8 +81,14 @@ public class BamParser
 	private byte recordtext[];
 	
 	bamparserstate_enum state;
-
-	public BamParser()
+	
+	boolean verbose;
+	long verbosemask;
+	long cnt;
+	long prevtime;
+	long starttime;
+	
+	private void init(boolean verbose, long verbosemask)
 	{
 		haveHeader = false;
 		BHP = new BamHeaderParser();
@@ -90,6 +96,26 @@ public class BamParser
 		state = bamparserstate_enum.read_len;
 		recordlen = 0;
 		recordlenread = 0;
+		this.verbose = verbose;	
+		this.verbosemask = verbosemask;
+		cnt = 0;
+		prevtime = System.nanoTime();
+		starttime = prevtime;
+	}
+
+	public BamParser()
+	{
+		init(false,0);
+	}
+
+	public BamParser(boolean verbose)
+	{
+		init(verbose,(1l<<20)-1);
+	}
+
+	public BamParser(boolean verbose, int verboseshift)
+	{
+		init(verbose,(1l<<verboseshift)-1);
 	}
 	
 	public BamHeaderParser getHeader()
@@ -409,8 +435,84 @@ public class BamParser
 			}
 		}
 	}
+	
+	private static String string2(long n)
+	{
+		if ( n >= 10 )
+			return new Long(n).toString();
+		else
+			return "0" + (new Long(n).toString());
+	}
+	
+	private static String frac(long v, long d)
+	{
+		float dd = (float)v/(float)d;
+		String s = new Float(dd).toString();
+		int i = 0;
+		while ( i < s.length() && s.charAt(i) == '0' )
+			++i;
+		return s.substring(i);
+	}
+	
+	private static String formatTime(long nano)
+	{
+		long micro = nano / 1000l;
+		nano -= micro*1000;
+		long milli = micro / 1000l;
+		micro -= milli * 1000l;
+		long sec = milli / 1000l;
+		milli -= sec * 1000l;
+		long min = sec/60;
+		sec -= min*60;
+		long hour = min/60;
+		min -= hour * 60;
+		long day = hour/24;
+		hour -= day*24;
+		
+		StringBuffer SB = new StringBuffer();
+		
+		if ( day != 0 )
+		{
+			SB.append(
+				new Long(day).toString() + "d" +
+				string2(hour) + "h" +
+				string2(min) + ":" + 
+				string2(sec) +
+				frac(milli,1000)
+			);
+		}
+		else if ( hour != 0 )
+		{
+			SB.append(
+				new Long(hour).toString() + "h" +
+				string2(min) + ":" + 
+				string2(sec) +
+				frac(milli,1000)
+			);		
+		}
+		else if ( min != 0 )
+		{
+			SB.append(
+				new Long(min).toString() + ":" +
+				string2(sec) +
+				frac(milli,1000)
+			);		
+		}
+		else // if ( sec )
+		{
+			SB.append(
+				new Long(sec).toString() +
+				frac(milli,1000)
+			);		
+		}
+		
+		return SB.toString();
+	}
 
-	public void addBlock(byte [] B, int offset, int len, BamRecordHandler handler) throws Exception
+	public void addBlock(
+		byte [] B, int offset, int len,
+		BamRecordHandler handler
+	) throws Exception
 	{
 		if ( ! haveHeader )
 		{
@@ -441,6 +543,16 @@ public class BamParser
 							)
 							{
 								handler.handleRecord(B,offset+4,rl);
+								cnt++;
+								if ( verbose && ((cnt & verbosemask) == 0) )
+								{
+									long curtime = System.nanoTime();
+									System.err.println("[V]\t"+cnt+"\t"
+										+formatTime(curtime-prevtime)+"\t"
+										+formatTime(curtime-starttime)
+									);
+									prevtime = curtime;
+								}
 								offset += 4+rl;
 							}
 						}
@@ -463,6 +575,16 @@ public class BamParser
 						if ( recordread == recordlen )
 						{
 							handler.handleRecord(recordtext,0,recordlen);
+							cnt++;
+							if ( verbose && ((cnt & verbosemask) == 0) )
+							{
+								long curtime = System.nanoTime();
+								System.err.println("[V]\t"+cnt+"\t"+
+									formatTime(curtime-prevtime)+"\t"+
+									formatTime(curtime-starttime));
+								prevtime = curtime;
+							}
+
 							state = bamparserstate_enum.read_len;
 							recordlen = 0;
 							recordlenread = 0;		
